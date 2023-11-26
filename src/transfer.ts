@@ -4,35 +4,44 @@ import { Readable, Writable } from "stream"
 import { publishAnimation, pullAnimation } from "./animation"
 import Queue from "./queue"
 import { State } from "./state"
+import { INumberStringHashMap } from "./util"
 
 const description = (id: number) =>
-  `Transferred from ID ${id} with roblox-animation-transfer`
+  `Lunar Transfer the anim`
 
 export default function transfer(
   inStream: Readable,
   outStream: Writable,
   state: State,
   concurrent: number,
-  groupId?: number
+  existingSet: INumberStringHashMap,
+  groupId?: number,
 ) {
   const queue = new Queue<{ id: number; title: string }>(
     async (d) => {
-      await new Promise(f => setTimeout(f, 1000));
-      outStream.write(
-        await publishAnimation(
-          state,
-          state.failedUploads.has(d.id) ? "Keyframe Sequence" : d.title,
-          description(d.id),
-          await pullAnimation(d.id),
-          groupId
-        )
-          .then((id) => `${id} - ${d.title} - (${d.id})\n`)
-          .catch((e) => {
-            state.failedUploads.add(d.id)
+      const existingItem = existingSet[d.id];
 
-            return Promise.reject(e)
-          })
-      )},
+      if(!existingItem) await new Promise(f => setTimeout(f, 1000));
+
+      const result = existingItem ? `${existingItem.newId} - ${existingItem.title} - (${existingItem.oldId})\n` : await publishAnimation(
+        state,
+        state.failedUploads.has(d.id) ? "Keyframe Sequence" : d.title,
+        description(d.id),
+        await pullAnimation(d.id),
+        groupId
+      )
+        .then((id) => `${id} - ${d.title} - (${d.id})\n`)
+        .catch((e) => {
+          state.failedUploads.add(d.id)
+
+          return Promise.reject(e)
+        });
+
+      if(existingItem) process.stdout.write("Found an existing item: ");
+
+      process.stdout.write(result);
+      outStream.write(result)
+    },
     {
       concurrent: concurrent,
       maxRetries: 5,
@@ -41,15 +50,19 @@ export default function transfer(
     }
   )
 
-  inStream.pipe(split2()).on("data", (line) => {
+  inStream.pipe(split2()).on("data", (line: string) => {
     const words = line.split(" ")
     const id = Number(words.shift())
-    const title = words.join(" ")
+    const title = words.join(" ").replace("Herring", "FishBird")
 
     if (Number.isNaN(id)) {
       console.error(chalk.red(`Error in input: id for "${title}" is not valid`))
     } else {
       queue.push({ id, title })
     }
-  })
+  });
+
+  /*inStream.addListener("data", (data: string) => {
+    console.log(data);
+  });*/
 }

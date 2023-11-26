@@ -2,6 +2,7 @@
 
 import chalk from "chalk"
 import * as fs from "fs"
+import * as split2 from "split2"
 import { findPassword } from "keytar"
 import { join } from "path"
 import { promisify } from "util"
@@ -9,6 +10,7 @@ import argv from "./argv"
 import { getGroupList, getUserList } from "./list"
 import getState from "./state"
 import transfer from "./transfer"
+import { INumberStringHashMap } from "./util"
 
 const readFile = promisify(fs.readFile)
 
@@ -81,6 +83,28 @@ async function main() {
 
   const state = await getState(cookie!)
 
+  const existingStream = argv.existingFile ? fs.createReadStream(argv.existingFile) : null;
+  const existingSet: INumberStringHashMap = {};
+  
+  if(existingStream !== null) {
+    existingStream.pipe(split2()).on("data", (line: string) => {
+      line = line.split(" ").join("");
+      const words = line.split(" - ");
+      const newId = Number(words[0]);
+      const title = words[1];
+      const oldId = Number(words[2].replace("(", "").replace(")", ""));
+  
+      if (Number.isNaN(newId) || Number.isNaN(oldId)) {
+        console.error(chalk.red(`Error in existing: newId=[${newId}] oldId=[${oldId}] for "${title}" is not valid`));
+        return;
+      }
+
+      existingSet[oldId] = {newId: newId, oldId: oldId, title: title};
+
+      console.log(`Found an existing: newId=[${newId}] oldId=[${oldId}] title=[${title}]`);
+    });
+  }
+
   const inStream = argv.inFile
     ? fs.createReadStream(argv.inFile)
     : process.stdin
@@ -98,7 +122,7 @@ async function main() {
     }
   } else {
     try {
-      transfer(inStream, outStream, state, argv.concurrent, argv.group)
+      transfer(inStream, outStream, state, argv.concurrent, existingSet, argv.group)
     } catch (e) {
       fatal(e.toString())
     }

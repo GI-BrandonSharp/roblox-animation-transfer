@@ -7,3 +7,7 @@ export const extract = <T>(transform: (value: string) => T, data: string, regex:
 
   return transform(match[1])
 }
+
+export interface INumberStringHashMap {
+  [key: number] : {newId: number, oldId: number, title: string};
+}

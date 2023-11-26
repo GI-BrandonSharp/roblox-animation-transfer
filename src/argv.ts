@@ -26,6 +26,12 @@ const argv = yargs
     string: true
   })
 
+  .option('existingFile', {
+    alias: 'e',
+    desc: 'Specify a file to read already converted animations from.',
+    string: true
+  })
+
   .option('group', {
     alias: 'g',
     desc: 'The target group id',
