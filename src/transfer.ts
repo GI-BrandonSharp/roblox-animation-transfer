@@ -16,7 +16,8 @@ export default function transfer(
   groupId?: number
 ) {
   const queue = new Queue<{ id: number; title: string }>(
-    async (d) =>
+    async (d) => {
+      await new Promise(f => setTimeout(f, 1000));
       outStream.write(
         await publishAnimation(
           state,
@@ -25,13 +26,13 @@ export default function transfer(
           await pullAnimation(d.id),
           groupId
         )
-          .then((id) => `${id} ${d.title}\n`)
+          .then((id) => `${id} - ${d.title} - (${d.id})\n`)
           .catch((e) => {
             state.failedUploads.add(d.id)
 
             return Promise.reject(e)
           })
-      ),
+      )},
     {
       concurrent: concurrent,
       maxRetries: 5,
